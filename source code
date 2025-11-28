@@ -1,0 +1,120 @@
+import customtkinter as ctk
+from tkinter import messagebox
+import requests
+from PIL import Image, ImageTk
+import time
+import io
+
+# ============ APP CONFIG ============
+ctk.set_appearance_mode("System")  # "Dark" or "Light"
+ctk.set_default_color_theme("blue")
+
+API_KEY = "06c921750b9a82d8f5d1294e1586276f"
+BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+
+
+# ============ FETCH WEATHER FUNCTION ============
+def get_weather():
+    city = city_entry.get().strip()
+    if not city:
+        messagebox.showwarning("Warning", "Please enter a city name!")
+        return
+
+    params = {"q": city, "appid": API_KEY, "units": "metric"}
+    try:
+        response = requests.get(BASE_URL, params=params)
+        data = response.json()
+
+        if response.status_code != 200:
+            messagebox.showerror("Error", data.get("message", "City not found!"))
+            return
+
+        # Extract data
+        condition = data["weather"][0]["main"]
+        description = data["weather"][0]["description"].title()
+        temp = int(data["main"]["temp"])
+        min_temp = int(data["main"]["temp_min"])
+        max_temp = int(data["main"]["temp_max"])
+        pressure = data["main"]["pressure"]
+        humidity = data["main"]["humidity"]
+        wind = data["wind"]["speed"]
+        sunrise = time.strftime('%I:%M %p', time.localtime(data["sys"]["sunrise"]))
+        sunset = time.strftime('%I:%M %p', time.localtime(data["sys"]["sunset"]))
+
+        # Update UI
+        weather_label.configure(text=f"{condition} ({description})")
+        temp_label.configure(text=f"{temp}°C")
+        details_text = (
+            f"Min Temp: {min_temp}°C\n"
+            f"Max Temp: {max_temp}°C\n"
+            f"Pressure: {pressure} hPa\n"
+            f"Humidity: {humidity}%\n"
+            f"Wind: {wind} m/s\n"
+            f"Sunrise: {sunrise}\n"
+            f"Sunset: {sunset}"
+        )
+        details_label.configure(text=details_text)
+
+        # Load and display weather icon
+        icon_code = data["weather"][0]["icon"]
+        icon_url = f"http://openweathermap.org/img/wn/{icon_code}@2x.png"
+        icon_response = requests.get(icon_url)
+        icon_img = Image.open(io.BytesIO(icon_response.content))
+        icon_photo = ImageTk.PhotoImage(icon_img)
+        icon_label.configure(image=icon_photo)
+        icon_label.image = icon_photo
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Something went wrong:\n{e}")
+
+
+# ============ UI DESIGN ============
+app = ctk.CTk()
+app.title("🌦 Weather App by Hemant")
+app.geometry("600x700")
+app.resizable(False, False)
+
+# Title
+title_label = ctk.CTkLabel(
+    app,
+    text="🌤 Live Weather Forecast",
+    font=ctk.CTkFont(size=28, weight="bold"),
+)
+title_label.pack(pady=20)
+
+# Input Frame
+frame = ctk.CTkFrame(app, corner_radius=12)
+frame.pack(pady=10, padx=20, fill="x")
+
+city_entry = ctk.CTkEntry(frame, placeholder_text="Enter city name", font=ctk.CTkFont(size=20))
+city_entry.pack(side="left", expand=True, fill="x", padx=10, pady=10)
+
+search_btn = ctk.CTkButton(frame, text="Search", command=get_weather, font=ctk.CTkFont(size=16, weight="bold"))
+search_btn.pack(side="right", padx=10, pady=10)
+
+# Weather Icon
+icon_label = ctk.CTkLabel(app, text="")
+icon_label.pack(pady=10)
+
+# Weather Info
+weather_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=24, weight="bold"))
+weather_label.pack(pady=5)
+
+temp_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=60, weight="bold"))
+temp_label.pack(pady=5)
+
+details_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=18))
+details_label.pack(pady=20)
+
+# Footer Clock
+def update_clock():
+    current_time = time.strftime('%I:%M:%S %p')
+    clock_label.configure(text=f"🕒 {current_time}")
+    app.after(1000, update_clock)
+
+clock_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=16, slant="italic"))
+clock_label.pack(pady=5)
+update_clock()
+
+# Run
+app.mainloop()
